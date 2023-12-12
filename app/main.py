@@ -11,7 +11,7 @@ from .database import engine, get_db
 from sqlalchemy.orm import Session
 from .routers import post, user, auth, vote
 from fastapi.middleware.cors import CORSMiddleware
-
+from .config import settings
 
 models.Base.metadata.create_all(bind=engine)
 
