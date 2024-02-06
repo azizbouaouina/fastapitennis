@@ -1,10 +1,15 @@
+import os
 from typing import List
 from .. import models, schemas, oauth2
 from sqlalchemy.orm import Session
-from fastapi import Response, status, HTTPException, Depends, APIRouter
+from fastapi import Response, status, HTTPException, Depends, APIRouter, File, UploadFile
 from ..database import get_db
 from typing import Optional
 from sqlalchemy import func
+from datetime import datetime, date
+import uuid
+from fastapi.responses import FileResponse
+
 
 router = APIRouter(prefix="/posts",
                    tags=["Posts"])
@@ -13,15 +18,41 @@ router = APIRouter(prefix="/posts",
 #
 
 @router.get("/", response_model=List[schemas.PostOut])
-def get_posts(db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user),
-              limit: int = 10, skip: int = 0, search: Optional[str] = ""):
-    # cursor.execute("SELECT * FROM posts")
-    # posts = cursor.fetchall()
-    # return {"data": "posts"}
+def get_posts(db: Session = Depends(get_db),
+              limit: int = 10, skip: int = 0, search: Optional[str] = "",):
 
     posts = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(models.Vote, models.Vote.post_id ==
-                                                                                       models.Post.id, isouter=True).group_by(models.Post.id).filter(models.Post.title.contains(search)).limit(limit).offset(skip).all()
+                                                                                       models.Post.id, isouter=True).group_by(models.Post.id).filter(models.Post.city.contains(search)).limit(limit).offset(skip).all()
 
+    liste = []
+    for p in posts:
+        liste.append(p._asdict())
+
+    return liste
+
+# get filtered posts
+
+
+@router.get("/filtered/", response_model=List[schemas.PostOut])
+def get__filtered_posts(db: Session = Depends(get_db), datetime_filter: date = None,
+                        level_filter: str = None, city_filter: str = None):
+
+    # Calculate the start and end of the specified day
+    datetime_start = datetime.combine(datetime_filter, datetime.min.time())
+    datetime_end = datetime.combine(datetime_filter, datetime.max.time())
+
+    posts = (
+        db.query(models.Post, func.count(models.Vote.post_id).label("votes"))
+        .join(
+            models.Vote, models.Vote.post_id == models.Post.id, isouter=True
+        )
+        .group_by(models.Post.id)
+        .filter(models.Post.datetime >= datetime_start)
+        .filter(models.Post.datetime <= datetime_end)
+        .filter(models.Post.level == level_filter)
+        .filter(models.Post.city == city_filter)
+        .all()
+    )
     liste = []
     for p in posts:
         liste.append(p._asdict())
@@ -32,12 +63,7 @@ def get_posts(db: Session = Depends(get_db), current_user: models.User = Depends
 # current_user: int = Depends(oauth2.get_current_user)
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
 def create_posts(post: schemas.PostCreate, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-    # cursor.execute("INSERT INTO posts (title,content,published) VALUES (%s,%s,%s) RETURNING *",
-    #                (post.title, post.content, post.published))
-    # new_post = cursor.fetchone()
 
-    # conn.commit()
-    # return {"post": new_post}
     new_post = models.Post(owner_id=current_user.id, **post.dict())
     db.add(new_post)
     db.commit()
@@ -47,12 +73,6 @@ def create_posts(post: schemas.PostCreate, db: Session = Depends(get_db), curren
 
 @router.get("/{id}", response_model=schemas.PostOut)
 def get_post(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-    # cursor.execute("SELECT * FROM posts WHERE id = %s RETURNING *", (str(id),))
-    # post = cursor.fetchone()
-    # if not post:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-    #                         detail=f"post with id {id} was not found")
-    # return ({"data": post})
 
     post = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(models.Vote, models.Vote.post_id ==
                                                                                       models.Post.id, isouter=True).group_by(models.Post.id).filter(models.Post.id == id).first()
@@ -66,17 +86,6 @@ def get_post(id: int, db: Session = Depends(get_db), current_user: models.User =
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def del_post(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
-
-    # cursor.execute("DELETE FROM posts WHERE id = %s returning*", (str(id),))
-    # deleted_post = cursor.fetchone()
-    # conn.commit()  # Commit the deletion
-
-    # if not deleted_post:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-    #                         detail=f"post with id {id} does not exist")
-
-    # return Response(status_code=status.HTTP_204_NO_CONTENT)
-
     post = db.query(models.Post).filter(models.Post.id == id)
     if not post.first():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -95,17 +104,6 @@ def del_post(id: int, db: Session = Depends(get_db), current_user: models.User =
 @router.put("/{id}", status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
 def update_post(id: int, updated_post: schemas.PostCreate, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
 
-    # cursor.execute("UPDATE posts SET title=%s, content=%s, published = %s Where id = %s returning*",
-    #                (post.title, post.content, post.published, str(id)))
-    # updated_post = cursor.fetchone()
-    # conn.commit()
-
-    # if updated_post == None:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-    #                         detail=f"post with id {id} does not exist")
-
-    # return ({"data": updated_post})
-
     post_query = db.query(models.Post).filter(models.Post.id == id)
 
     post = post_query.first()
@@ -121,3 +119,32 @@ def update_post(id: int, updated_post: schemas.PostCreate, db: Session = Depends
     post_query.update(updated_post.dict(), synchronize_session=False)
     db.commit()
     return post_query.first()
+
+
+IMAGEDIR = "./static/images/"
+
+
+@router.post("/upload/", status_code=status.HTTP_201_CREATED, )
+async def create_upload_file(file: UploadFile = File(...)):
+
+    file.filename = f"{uuid.uuid4()}.jpg"
+    contents = await file.read()
+
+    print(f"{IMAGEDIR}{file.filename}")
+
+    # save the file
+    with open(f"{IMAGEDIR}{file.filename}", "wb") as f:
+        f.write(contents)
+
+    return {"filename": file.filename}
+
+
+# @router.get("/show/", )
+# async def read_file_image():
+
+#     files = os.listdir(IMAGEDIR)
+
+#     path = f"{IMAGEDIR}{files[0]}"
+#     print(path)
+
+#     return FileResponse(path)
