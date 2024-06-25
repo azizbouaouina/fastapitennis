@@ -10,7 +10,9 @@ router = APIRouter(prefix="/users",
                    tags=["Users"])
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.Token)
+# @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.Token)
+
+@router.post("/", status_code=status.HTTP_201_CREATED,)
 def create_users(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
     hashed_password = utils.hash(user.password)
@@ -31,7 +33,7 @@ def create_users(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
     access_token = oauth2.create_access_token(data={"user_id": new_user.id})
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user_id": new_user.id}
 
 
 # @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.UserOut)
@@ -56,21 +58,22 @@ def create_users(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{id}", response_model=schemas.UserOut)
-def get_user(id: int, db: Session = Depends(get_db)):
+def get_user(id: int, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
 
     user = db.query(models.User).filter(models.User.id == id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"user with id {id} was not found")
+    if id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail=f'user with id {current_user.id} is not authorized to access this')
+
     return user
-
-
-IMAGEDIR = "./static/images/"
 
 
 @router.put("/{id}", status_code=status.HTTP_201_CREATED,
             response_model=schemas.UserOut)
-async def update_user(id: int, updated_user: schemas.UserUpdate, db: Session = Depends(get_db), ):
+async def update_user(id: int, updated_user: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
 
     user_query = db.query(models.User).filter(models.User.id == id)
     user = user_query.first()
@@ -79,16 +82,23 @@ async def update_user(id: int, updated_user: schemas.UserUpdate, db: Session = D
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"user with id {id} does not exist")
 
-    # user_query.update(updated_user.dict(), synchronize_session=False)
-    # db.commit()
-    # return user_query.first()
+    if id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail=f'user with id {current_user.id} is not authorized to access this')
 
-    for attr, value in updated_user.dict(exclude_unset=True).items():
-        setattr(user, attr, value)
-
+    user_query.update(updated_user.dict(), synchronize_session=False)
     db.commit()
-    db.refresh(user)
-    return user
+    return user_query.first()
+
+    # for attr, value in updated_user.dict(exclude_unset=True).items():
+    #     setattr(user, attr, value)
+
+    # db.commit()
+    # db.refresh(user)
+    # return user
+
+
+IMAGEDIR = "./static/images/"
 
 
 @router.put("/{id}/upload/", status_code=status.HTTP_201_CREATED,

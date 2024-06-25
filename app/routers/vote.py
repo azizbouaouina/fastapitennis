@@ -10,7 +10,7 @@ router = APIRouter(prefix="/votes",
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-def create_posts(vote: schemas.Vote, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
+def create_votes(vote: schemas.Vote, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
 
     post = db.query(models.Post).filter(
         models.Post.id == vote.post_id).first()
@@ -42,3 +42,82 @@ def create_posts(vote: schemas.Vote, db: Session = Depends(get_db), current_user
         vote_query.delete(synchronize_session=False)
         db.commit()
         return {"message ": "sucessfuly deleted vote"}
+
+
+# response_model = List[schemas.UserOut]
+@router.get("/{post_id}", response_model=List[schemas.UserOut])
+def get_request(post_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
+
+    post = db.query(models.Post).filter(
+        models.Post.id == post_id).first()
+
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"post with id {post_id} does not exist")
+
+    if post.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail=f"user with id {current_user.id} is unothorized to access this post")
+
+    request = db.query(models.User
+                       ).join(
+        models.Vote,
+        models.Vote.user_id == models.User.id,
+        isouter=True
+    ).filter(
+        models.Vote.post_id == post_id
+    ).all()
+
+    if not request:
+        return []
+
+    liste = []
+    for r in request:
+        liste.append(r)
+
+    return liste
+#
+
+
+@router.delete("/deleted", status_code=status.HTTP_204_NO_CONTENT)
+def del_request(user_id: int, post_id, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
+    request = db.query(models.Vote).filter(models.Vote.user_id ==
+                                           user_id).filter(models.Vote.post_id == post_id)
+    if not request.first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"request not found")
+
+    request.delete(synchronize_session=False)
+    db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/accepted", )
+def del_requests(user_id: int, post_id, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
+    request = db.query(models.Vote).filter(models.Vote.user_id !=
+                                           user_id).filter(models.Vote.post_id == post_id)
+    # if not request.first():
+    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+    #                         detail=f"requests not found")
+    if request.first():
+        request.delete(synchronize_session=False)
+        db.commit()
+
+    return Response(status_code=status.HTTP_200_OK)
+
+#
+
+
+@router.put("/accepted")
+def accept_request(user_id: int, post_id, db: Session = Depends(get_db), current_user: models.User = Depends(oauth2.get_current_user)):
+    request = db.query(models.Vote).filter(models.Vote.user_id ==
+                                           user_id).filter(models.Vote.post_id == post_id).first()
+    if not request:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"request not found")
+
+    request.accepted = True
+    db.commit()
+    db.refresh(request)
+    return request

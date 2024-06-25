@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, date
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 
 class UserOut(BaseModel):
@@ -11,6 +11,8 @@ class UserOut(BaseModel):
     created_at: datetime
     photo: str
     date_of_birth: date
+    gender: str
+    phone_numer: str
 
     class Config:
         orm_mode = True
@@ -41,6 +43,8 @@ class PostOut(BaseModel):
 
     Post: Post
     votes: int
+    voter_ids: List[Optional[int]] = None
+    accepted: List[Optional[bool]] = None
 
     class Config:
         orm_mode = True
@@ -58,11 +62,11 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = ""
-    password: Optional[str] = ""
-    name: Optional[str] = ""
-    family_name: Optional[str] = ""
-    gender: Optional[str] = ""
+
+    name: str
+    family_name: str
+    gender: str
+    date_of_birth: date
     phone_numer: Optional[str] = ""
 
 
