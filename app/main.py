@@ -40,17 +40,3 @@ app.include_router(auth.router)
 app.include_router(vote.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-# while True:
-
-#     try:
-#         conn = psycopg2.connect(host='localhost', database='fastapi',
-#                                 user='postgres', password='aziz', cursor_factory=RealDictCursor)
-#         cursor = conn.cursor()
-#         print('Database connection was successful')
-#         break
-#     except Exception as error:
-#         print("connection to database failed")
-#         print("Error : ", error)
-#         time.sleep(2)
