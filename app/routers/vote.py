@@ -76,7 +76,6 @@ def get_request(post_id: int, db: Session = Depends(get_db), current_user: model
         liste.append(r)
 
     return liste
-#
 
 
 @router.delete("/deleted", status_code=status.HTTP_204_NO_CONTENT)
@@ -105,8 +104,6 @@ def del_requests(user_id: int, post_id, db: Session = Depends(get_db), current_u
         db.commit()
 
     return Response(status_code=status.HTTP_200_OK)
-
-#
 
 
 @router.put("/accepted")

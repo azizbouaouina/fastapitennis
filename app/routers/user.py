@@ -10,8 +10,6 @@ router = APIRouter(prefix="/users",
                    tags=["Users"])
 
 
-# @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.Token)
-
 @router.post("/", status_code=status.HTTP_201_CREATED,)
 def create_users(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
@@ -34,27 +32,6 @@ def create_users(user: schemas.UserCreate, db: Session = Depends(get_db)):
     access_token = oauth2.create_access_token(data={"user_id": new_user.id})
 
     return {"access_token": access_token, "token_type": "bearer", "user_id": new_user.id}
-
-
-# @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.UserOut)
-# def create_users(user: schemas.UserCreate, db: Session = Depends(get_db)):
-
-#     hashed_password = utils.hash(user.password)
-#     user.password = hashed_password
-
-#     new_user = models.User(**user.dict())
-
-#     user = db.query(models.User).filter(
-#         models.User.email == new_user.email).first()
-
-#     if user:
-#         raise HTTPException(status_code=status.HTTP_226_IM_USED,
-#                             detail="Email already used")
-
-#     db.add(new_user)
-#     db.commit()
-#     db.refresh(new_user)
-#     return new_user
 
 
 @router.get("/{id}", response_model=schemas.UserOut)
@@ -89,13 +66,6 @@ async def update_user(id: int, updated_user: schemas.UserUpdate, db: Session = D
     user_query.update(updated_user.dict(), synchronize_session=False)
     db.commit()
     return user_query.first()
-
-    # for attr, value in updated_user.dict(exclude_unset=True).items():
-    #     setattr(user, attr, value)
-
-    # db.commit()
-    # db.refresh(user)
-    # return user
 
 
 IMAGEDIR = "./static/images/"

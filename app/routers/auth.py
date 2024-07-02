@@ -8,8 +8,6 @@ from ..oauth2 import verify_access_token
 router = APIRouter(tags=["authentification"])
 
 
-# @router.post("/login", response_model=schemas.Token)
-
 @router.post("/login")
 def login(user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
 
