@@ -16,6 +16,8 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - postgres
+    volumes:
+      - static-images:/static/images
 
   postgres:
     image: postgres
@@ -34,3 +36,4 @@ services:
 
 volumes:
   postgres-db:
+  static-images:
